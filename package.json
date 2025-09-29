@@ -1,0 +1,24 @@
+{
+    "name": "emkc-quiz-system",
+    "version": "1.0.0",
+    "description": "文化祭用早押しクイズシステム",
+    "scripts": {
+        "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+        "dev:server": "cd server && npm run dev",
+        "dev:client": "cd client && npm run dev",
+        "start:server": "cd server && npm start",
+        "start:client": "cd client && npm start",
+        "build:client": "cd client && npm run build"
+    },
+    "keywords": [
+        "quiz",
+        "arduino",
+        "文化祭",
+        "早押し"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
