@@ -16,8 +16,7 @@
         "文化祭",
         "早押し"
     ],
-    "author": "",
-    "license": "MIT",
+    "author": "JF9TGL",
     "devDependencies": {
         "concurrently": "^8.2.2"
     }
