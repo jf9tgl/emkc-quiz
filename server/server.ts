@@ -20,6 +20,19 @@ import { SerialPort } from "serialport";
 
 const PORT = process.env.PORT || 3001;
 
+const portPath = await findArduinoPort();
+if (!portPath) {
+    console.error("Arduino ポートが見つかりませんでした");
+    process.exit(1);
+}
+
+const port = new SerialPort({
+    path: portPath,
+    baudRate: 9600,
+});
+    
+initializeSerial();
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -198,17 +211,6 @@ async function findArduinoPort(): Promise<string | null> {
 }
 
 async function initializeSerial() {
-    const portPath = await findArduinoPort();
-    if (!portPath) {
-        console.error("Arduino ポートが見つかりませんでした");
-        return;
-    }
-
-    const port = new SerialPort({
-        path: portPath,
-        baudRate: 9600,
-    });
-
     port.on("open", () => {
         console.log("Arduino接続完了!");
     });
@@ -222,6 +224,10 @@ async function initializeSerial() {
 
         try {
             const buttonData = JSON.parse(data.toString());
+
+            if (buttonData && buttonData.dataType === "buttonPress") {
+                handleButtonPress(buttonData);
+            }
         } catch (error) {
             console.error("データの解析エラー:", error);
         }
@@ -231,6 +237,7 @@ async function initializeSerial() {
 type ArduinoData = {
     dataType: string;
     playerId?: number;
+    timestamp: number;
 };
 
 function handleButtonPress(data: ArduinoData) {
@@ -257,7 +264,10 @@ function handleButtonPress(data: ArduinoData) {
             quizState.pressedOrder.push(playerId);
             console.log(`プレイヤー ${playerId} がボタンを押しました`);
 
+            io.emit("buttonPressed", { playerId, timestamp: data.timestamp });
             io.emit("state", quizState);
+        } else {
+            console.warn(`無効なプレイヤーID: ${playerId}`);
         }
     }
 }
