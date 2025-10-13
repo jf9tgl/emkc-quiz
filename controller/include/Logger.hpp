@@ -17,7 +17,7 @@
 
 #include <ArduinoSTL.h>
 
-#define DEBUG // / 定義するとデバックメッセージが出力されます。
+// #define DEBUG // / 定義するとデバックメッセージが出力されます。
 
 class Logger
 {

@@ -17,6 +17,7 @@ import http from "http";
 import { Server, Socket } from "socket.io";
 import cors from "cors";
 import { SerialPort } from "serialport";
+// import net from "net";
 
 const PORT = process.env.PORT || 3001;
 
@@ -26,11 +27,13 @@ if (!portPath) {
     process.exit(1);
 }
 
-const port = new SerialPort({
+const controller = new SerialPort({
     path: portPath,
     baudRate: 9600,
 });
-    
+
+// const controller = net.connect(4000, "localhost");
+
 initializeSerial();
 
 const app = express();
@@ -185,12 +188,10 @@ async function findArduinoPort(): Promise<string | null> {
 
     // envに指定されたポートを優先
     if (process.env.ARDUINO_PORT) {
-        const envPort = ports.find(
-            (port) => port.path === process.env.ARDUINO_PORT
-        );
+        const envPort = process.env.ARDUINO_PORT;
         if (envPort) {
-            console.log(`ARDUINO_PORTより${envPort.path}を使用`);
-            return envPort.path;
+            console.log(`ARDUINO_PORTより${envPort}を使用`);
+            return envPort;
         }
         console.warn(
             `指定されたARDUINO_PORT ${process.env.ARDUINO_PORT} が見つかりません`
@@ -205,69 +206,91 @@ async function findArduinoPort(): Promise<string | null> {
         console.log(`Arduino ポートが見つかりました: ${arduinoPort.path}`);
     } else {
         console.warn(`Arduino ポートが見つかりませんでした`);
+        console.warn(`利用可能なポート:`);
+        ports.forEach((port) => {
+            console.warn(`- ${port.path} (${port.manufacturer || "Unknown"})`);
+        });
+        // 手動で指定
+        console.log(`手動でポートを指定してください。`);
     }
 
     return arduinoPort ? arduinoPort.path : null;
 }
 
 async function initializeSerial() {
-    port.on("open", () => {
+    controller.on("open", () => {
         console.log("Arduino接続完了!");
     });
 
-    port.on("error", (err) => {
+    controller.on("error", (err) => {
         console.error("シリアルポートエラー:", err);
     });
 
-    port.on("data", (data) => {
-        console.log("Arduino からのデータ:", data.toString());
+    let buffer = "";
 
-        try {
-            const buttonData = JSON.parse(data.toString());
+    controller.on("data", (data) => {
+        buffer += data.toString();
 
-            if (buttonData && buttonData.dataType === "buttonPress") {
-                handleButtonPress(buttonData);
+        // 改行文字で区切ってメッセージを分割
+        const lines = buffer.split("\n");
+
+        // 最後の要素（未完成の可能性がある）をバッファに残す
+        buffer = lines.pop() || "";
+
+        // 完成したメッセージを処理
+        lines.forEach((line) => {
+            if (line.trim()) {
+                console.log("Arduino からのデータ:", line);
+
+                try {
+                    const buttonData = JSON.parse(line);
+
+                    if (buttonData && buttonData.type === "buttonPress") {
+                        handleButtonPress(buttonData);
+                    }
+                } catch (error) {
+                    console.error("データの解析エラー:", error);
+                }
             }
-        } catch (error) {
-            console.error("データの解析エラー:", error);
-        }
+        });
     });
 }
 
 type ArduinoData = {
-    dataType: string;
-    playerId?: number;
+    type: string;
+    buttonId?: number;
+    message?: string;
     timestamp: number;
 };
 
 function handleButtonPress(data: ArduinoData) {
-    if (data.dataType === "buttonPress" && data.playerId) {
-        const playerId = data.playerId;
-        const playerIndex = playerId - 1;
+    if (data.type === "pressedButton" && data.buttonId) {
+        const buttonId = data.buttonId;
+        const playerIndex = buttonId - 1;
 
         if (quizState.isActive === false) {
             console.log(
-                `クイズがアクティブではないので: ${playerId} の押下を無視`
+                `クイズがアクティブではないので: ${buttonId} の押下を無視`
             );
             return;
         }
 
         if (playerIndex >= 0 && playerIndex < quizState.players.length) {
             if (quizState.players[playerIndex]!.pressed) {
-                console.log(`Player ${playerId} は既に押下済み`);
+                console.log(`Player ${buttonId} は既に押下済み`);
                 return;
             }
 
             quizState.players[playerIndex]!.pressed = true;
             quizState.players[playerIndex]!.order =
                 quizState.pressedOrder.length + 1;
-            quizState.pressedOrder.push(playerId);
-            console.log(`プレイヤー ${playerId} がボタンを押しました`);
+            quizState.pressedOrder.push(buttonId);
+            console.log(`プレイヤー ${buttonId} がボタンを押しました`);
 
-            io.emit("buttonPressed", { playerId, timestamp: data.timestamp });
+            io.emit("buttonPressed", { buttonId, timestamp: data.timestamp });
             io.emit("state", quizState);
         } else {
-            console.warn(`無効なプレイヤーID: ${playerId}`);
+            console.warn(`無効なプレイヤーID: ${buttonId}`);
         }
     }
 }
