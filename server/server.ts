@@ -2,37 +2,42 @@
  * @file server.ts
  * @brief 尚美展用、クイズシステム、バックエンドサーバー
  * @author JF9TGL
- * @date 2024-10-01
+ * @date 2024-10-13 (Updated)
  *
  * Arduinoを用いた早押しシステムのバックエンドサーバーです。
  * フロントエンドは Next.js で実装しています。
  *
- * Arduinoとの通信はシリアルポートを介したOSCライクな通信で行います。
- * 数十秒に一度、ヒートビートを送信し、接続が維持されているか確認します。
- *
+ * Arduinoとの通信はシリアルポートを介したJSON通信で行います。
  * Next.jsとの通信はWebSocketを用いて行います。
+ *
+ * 設計書に基づいて6人プレーヤー対応、全クライアントブロードキャスト対応
  */
 import express from "express";
 import http from "http";
 import { Server, Socket } from "socket.io";
 import cors from "cors";
 import { SerialPort } from "serialport";
-// import net from "net";
+import net from "net";
 
 const PORT = process.env.PORT || 3001;
 
-const portPath = await findArduinoPort();
-if (!portPath) {
-    console.error("Arduino ポートが見つかりませんでした");
-    process.exit(1);
+// Arduino接続設定（開発時はシミュレーター使用）
+let controller: SerialPort | net.Socket;
+
+if (process.env.USE_SIMULATOR === "true") {
+    controller = net.connect(4000, "localhost");
+    console.log("Using Arduino simulator at localhost:4000");
+} else {
+    const portPath = await findArduinoPort();
+    if (!portPath) {
+        console.error("Arduino ポートが見つかりませんでした");
+        process.exit(1);
+    }
+    controller = new SerialPort({
+        path: portPath,
+        baudRate: 9600,
+    });
 }
-
-const controller = new SerialPort({
-    path: portPath,
-    baudRate: 9600,
-});
-
-// const controller = net.connect(4000, "localhost");
 
 initializeSerial();
 
@@ -40,20 +45,21 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: ["http://localhost:3000", "http://localhost:3001"],
         methods: ["GET", "POST"],
+        credentials: true,
     },
 });
 
-app.use(cors());
+app.use(
+    cors({
+        origin: ["http://localhost:3000", "http://localhost:3001"],
+        credentials: true,
+    })
+);
 app.use(express.json());
 
-io.on("connection", (socket) => connection(socket));
-
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
-
+// 型定義（フロントエンドと一致）
 type Player = {
     id: number;
     name: string;
@@ -72,189 +78,17 @@ type QuizState = {
     questionData: QuestionData | null;
     isActive: boolean;
     players: Player[];
-    pressedOrder: number[]; // プレーヤーID
+    pressedOrder: number[];
 };
 
 type QuizSetting = {
     maxPlayers: number;
-    hintTime: number; // ヒント表示までの時間（秒）
-    answerTime: number; // 解答受付時間（秒）
-    correctPoints: number; // 正解時の加点
-    incorrectPoints: number; // 不正解時の減点
-    answerBreakPenalty: number; // 何問休みのペナルティ 0は無効
+    hintTime: number;
+    answerTime: number;
+    correctPoints: number;
+    incorrectPoints: number;
+    answerBreakPenalty: number;
 };
-
-const quizState: QuizState = {
-    questionData: null,
-    isActive: false,
-    players: [
-        { id: 1, name: "Player 1", score: 0, pressed: false, order: null },
-    ],
-    pressedOrder: [],
-};
-
-const quizSetting: QuizSetting = {
-    maxPlayers: 4,
-    hintTime: 10,
-    answerTime: 20,
-    correctPoints: 10,
-    incorrectPoints: -5,
-    answerBreakPenalty: 1,
-};
-
-function correctAnswer() {
-    // oserder 1 のプレーヤーにポイントを加算
-    if (quizState.pressedOrder.length === 0) return;
-    const firstPlayerId = quizState.pressedOrder[0];
-    const playerIndex = firstPlayerId! - 1;
-    quizState.players[playerIndex]!.score += quizSetting.correctPoints;
-    quizState.isActive = false; // クイズ終了
-    quizState.pressedOrder = [];
-    quizState.players.forEach((player) => {
-        player.pressed = false;
-        player.order = null;
-    });
-
-    console.log(`Player ${firstPlayerId} が正解しました！`);
-}
-
-function incorrectAnswer() {
-    // オーダーが最初のプレーヤーのポイントを減算
-    if (quizState.pressedOrder.length === 0) return;
-    const firstPlayerId = quizState.pressedOrder[0];
-    const playerIndex = firstPlayerId! - 1;
-    quizState.players[playerIndex]!.score += quizSetting.incorrectPoints;
-    // オーダーから削除
-    quizState.pressedOrder.shift();
-    quizState.players[playerIndex]!.pressed = false;
-    quizState.players[playerIndex]!.order = null;
-    // オーダーを更新
-    quizState.pressedOrder.forEach((playerId, index) => {
-        const idx = playerId - 1;
-        quizState.players[idx]!.order = index + 1;
-    });
-
-    console.log(`Player ${firstPlayerId} が不正解しました！`);
-}
-
-function connection(socket: Socket) {
-    console.log("クライアント接続:", socket.id);
-
-    // クライアントに現在の状態を送信
-    socket.emit("state", quizState);
-    // クライアントからのメッセージを受信
-    socket.on("setQuestion", (data) => {
-        quizState.questionData = data;
-        quizState.isActive = true;
-        quizState.pressedOrder = [];
-    });
-
-    socket.on("updatePlayerName", (data) => {
-        const { playerId, name } = data;
-        const playerIndex = playerId - 1;
-        if (playerIndex >= 0 && playerIndex < quizState.players.length) {
-            // @ts-ignore
-            quizState.players[playerIndex].name = name;
-            socket.emit("state", quizState);
-        }
-    });
-
-    socket.on("correctAnswer", () => {
-        correctAnswer();
-        socket.emit("state", quizState);
-    });
-
-    socket.on("incorrectAnswer", () => {
-        incorrectAnswer();
-        socket.emit("state", quizState);
-    });
-
-    socket.on("endQuiz", () => {
-        quizState.isActive = false;
-        quizState.pressedOrder = [];
-        quizState.players.forEach((player) => {
-            player.pressed = false;
-            player.order = null;
-        });
-        socket.emit("state", quizState);
-    });
-}
-
-async function findArduinoPort(): Promise<string | null> {
-    const ports = await SerialPort.list();
-    ports.forEach((port) => {
-        console.log(`- ${port.path} (${port.manufacturer || "Unknown"})`);
-    });
-
-    // envに指定されたポートを優先
-    if (process.env.ARDUINO_PORT) {
-        const envPort = process.env.ARDUINO_PORT;
-        if (envPort) {
-            console.log(`ARDUINO_PORTより${envPort}を使用`);
-            return envPort;
-        }
-        console.warn(
-            `指定されたARDUINO_PORT ${process.env.ARDUINO_PORT} が見つかりません`
-        );
-    }
-
-    const arduinoPort = ports.find(
-        (port) => port.manufacturer && port.manufacturer.includes("Arduino")
-    );
-
-    if (arduinoPort) {
-        console.log(`Arduino ポートが見つかりました: ${arduinoPort.path}`);
-    } else {
-        console.warn(`Arduino ポートが見つかりませんでした`);
-        console.warn(`利用可能なポート:`);
-        ports.forEach((port) => {
-            console.warn(`- ${port.path} (${port.manufacturer || "Unknown"})`);
-        });
-        // 手動で指定
-        console.log(`手動でポートを指定してください。`);
-    }
-
-    return arduinoPort ? arduinoPort.path : null;
-}
-
-async function initializeSerial() {
-    controller.on("open", () => {
-        console.log("Arduino接続完了!");
-    });
-
-    controller.on("error", (err) => {
-        console.error("シリアルポートエラー:", err);
-    });
-
-    let buffer = "";
-
-    controller.on("data", (data) => {
-        buffer += data.toString();
-
-        // 改行文字で区切ってメッセージを分割
-        const lines = buffer.split("\n");
-
-        // 最後の要素（未完成の可能性がある）をバッファに残す
-        buffer = lines.pop() || "";
-
-        // 完成したメッセージを処理
-        lines.forEach((line) => {
-            if (line.trim()) {
-                console.log("Arduino からのデータ:", line);
-
-                try {
-                    const buttonData = JSON.parse(line);
-
-                    if (buttonData && buttonData.type === "buttonPress") {
-                        handleButtonPress(buttonData);
-                    }
-                } catch (error) {
-                    console.error("データの解析エラー:", error);
-                }
-            }
-        });
-    });
-}
 
 type ArduinoData = {
     type: string;
@@ -263,34 +97,338 @@ type ArduinoData = {
     timestamp: number;
 };
 
+// 初期状態（6人プレーヤー対応）
+const quizState: QuizState = {
+    questionData: null,
+    isActive: false,
+    players: Array.from({ length: 6 }, (_, i) => ({
+        id: i + 1,
+        name: `Player ${i + 1}`,
+        score: 0,
+        pressed: false,
+        order: null,
+    })),
+    pressedOrder: [],
+};
+
+const quizSetting: QuizSetting = {
+    maxPlayers: 6,
+    hintTime: 10,
+    answerTime: 20,
+    correctPoints: 10,
+    incorrectPoints: -5,
+    answerBreakPenalty: 1,
+};
+
+// ゲームロジック関数
+function correctAnswer() {
+    if (quizState.pressedOrder.length === 0) {
+        console.warn("No players pressed buttons");
+        return;
+    }
+
+    const firstPlayerId = quizState.pressedOrder[0];
+    if (!firstPlayerId) {
+        console.warn("Invalid first player ID");
+        return;
+    }
+
+    const playerIndex = firstPlayerId - 1;
+    const player = quizState.players[playerIndex];
+
+    if (player) {
+        player.score += quizSetting.correctPoints;
+        console.log(
+            `Player ${firstPlayerId} が正解しました！ (${quizSetting.correctPoints}pt獲得)`
+        );
+    }
+
+    // クイズ終了処理
+    endCurrentQuiz();
+
+    // 全クライアントに状態をブロードキャスト
+    io.emit("state", quizState);
+}
+
+function incorrectAnswer() {
+    if (quizState.pressedOrder.length === 0) {
+        console.warn("No players pressed buttons");
+        return;
+    }
+
+    const firstPlayerId = quizState.pressedOrder[0];
+    if (!firstPlayerId) {
+        console.warn("Invalid first player ID");
+        return;
+    }
+
+    const playerIndex = firstPlayerId - 1;
+    const player = quizState.players[playerIndex];
+
+    if (player) {
+        player.score += quizSetting.incorrectPoints;
+        console.log(
+            `Player ${firstPlayerId} が不正解しました！ (${Math.abs(
+                quizSetting.incorrectPoints
+            )}pt減点)`
+        );
+
+        // プレーヤーをオーダーから削除
+        quizState.pressedOrder.shift();
+        player.pressed = false;
+        player.order = null;
+
+        // 残りのプレーヤーのオーダーを更新
+        quizState.pressedOrder.forEach((playerId, index) => {
+            const idx = playerId - 1;
+            const updatePlayer = quizState.players[idx];
+            if (updatePlayer) {
+                updatePlayer.order = index + 1;
+            }
+        });
+    }
+
+    // 全クライアントに状態をブロードキャスト
+    io.emit("state", quizState);
+}
+
+function endCurrentQuiz() {
+    quizState.isActive = false;
+    quizState.pressedOrder = [];
+    quizState.players.forEach((player) => {
+        player.pressed = false;
+        player.order = null;
+    });
+}
+
+function endQuiz() {
+    endCurrentQuiz();
+    console.log("クイズが終了されました");
+
+    // 全クライアントに状態をブロードキャスト
+    io.emit("state", quizState);
+}
+
+// Socket.IO接続処理
+function connection(socket: Socket) {
+    console.log("クライアント接続:", socket.id);
+
+    // 接続直後に現在の状態を送信
+    socket.emit("state", quizState);
+
+    // 問題設定
+    socket.on("setQuestion", (data: QuestionData) => {
+        console.log("問題が設定されました:", data.question);
+        quizState.questionData = data;
+        quizState.isActive = true;
+        quizState.pressedOrder = [];
+
+        // 押下状態をリセット
+        quizState.players.forEach((player) => {
+            player.pressed = false;
+            player.order = null;
+        });
+
+        // 全クライアントに新しい状態をブロードキャスト
+        io.emit("state", quizState);
+    });
+
+    // プレーヤー名更新
+    socket.on(
+        "updatePlayerName",
+        (data: { playerId: number; name: string }) => {
+            const { playerId, name } = data;
+            const playerIndex = playerId - 1;
+            const player = quizState.players[playerIndex];
+
+            if (player) {
+                player.name = name;
+                console.log(
+                    `Player ${playerId} の名前が '${name}' に変更されました`
+                );
+
+                // 全クライアントに状態をブロードキャスト
+                io.emit("state", quizState);
+            } else {
+                console.warn(`無効なプレーヤーID: ${playerId}`);
+            }
+        }
+    );
+
+    // 正解処理
+    socket.on("correctAnswer", () => {
+        console.log("正解ボタンが押されました");
+        correctAnswer();
+    });
+
+    // 不正解処理
+    socket.on("incorrectAnswer", () => {
+        console.log("不正解ボタンが押されました");
+        incorrectAnswer();
+    });
+
+    // クイズ終了
+    socket.on("endQuiz", () => {
+        console.log("クイズ終了ボタンが押されました");
+        endQuiz();
+    });
+
+    // 切断処理
+    socket.on("disconnect", (reason) => {
+        console.log("クライアント切断:", socket.id, "理由:", reason);
+    });
+}
+
+// Arduino通信処理
 function handleButtonPress(data: ArduinoData) {
     if (data.type === "pressedButton" && data.buttonId) {
         const buttonId = data.buttonId;
         const playerIndex = buttonId - 1;
 
-        if (quizState.isActive === false) {
+        // クイズがアクティブでない場合は無視
+        if (!quizState.isActive) {
             console.log(
-                `クイズがアクティブではないので: ${buttonId} の押下を無視`
+                `クイズがアクティブではないので Player ${buttonId} の押下を無視`
             );
             return;
         }
 
-        if (playerIndex >= 0 && playerIndex < quizState.players.length) {
-            if (quizState.players[playerIndex]!.pressed) {
-                console.log(`Player ${buttonId} は既に押下済み`);
-                return;
-            }
-
-            quizState.players[playerIndex]!.pressed = true;
-            quizState.players[playerIndex]!.order =
-                quizState.pressedOrder.length + 1;
-            quizState.pressedOrder.push(buttonId);
-            console.log(`プレイヤー ${buttonId} がボタンを押しました`);
-
-            io.emit("buttonPressed", { buttonId, timestamp: data.timestamp });
-            io.emit("state", quizState);
-        } else {
-            console.warn(`無効なプレイヤーID: ${buttonId}`);
+        // プレーヤーIDの範囲チェック
+        if (playerIndex < 0 || playerIndex >= quizState.players.length) {
+            console.warn(`無効なボタンID: ${buttonId} (有効範囲: 1-6)`);
+            return;
         }
+
+        const player = quizState.players[playerIndex];
+        if (!player) {
+            console.warn(`Player not found for button ${buttonId}`);
+            return;
+        }
+
+        // 既に押されている場合は無視
+        if (player.pressed) {
+            console.log(`Player ${buttonId} は既に押下済み`);
+            return;
+        }
+
+        // ボタン押下を記録
+        player.pressed = true;
+        player.order = quizState.pressedOrder.length + 1;
+        quizState.pressedOrder.push(buttonId);
+
+        console.log(
+            `Player ${buttonId} がボタンを押しました (${player.order}番目)`
+        );
+
+        // ボタン押下イベントをブロードキャスト
+        io.emit("buttonPressed", { buttonId, timestamp: data.timestamp });
+
+        // 更新された状態を全クライアントにブロードキャスト
+        io.emit("state", quizState);
     }
 }
+
+// グローバルバッファでデータを蓄積
+let dataBuffer = "";
+
+// シリアル通信初期化
+async function initializeSerial() {
+    controller.on("data", (data: Buffer) => {
+        // 受信データをバッファに追加
+        dataBuffer += data.toString();
+
+        // 改行文字で区切ってメッセージを分割
+        const lines = dataBuffer.split("\n");
+
+        // 最後の要素（未完成の可能性がある）をバッファに残す
+        dataBuffer = lines.pop() || "";
+
+        // 完成したメッセージを処理
+        lines.forEach((line) => {
+            const trimmedLine = line.trim();
+            if (trimmedLine) {
+                console.log("Arduino からのデータ:", trimmedLine);
+
+                try {
+                    const buttonData = JSON.parse(trimmedLine) as ArduinoData;
+                    handleButtonPress(buttonData);
+                } catch (error) {
+                    console.error(
+                        "データの解析エラー:",
+                        error,
+                        "受信データ:",
+                        trimmedLine
+                    );
+                    // 不正なJSONの場合は無視して継続
+                }
+            }
+        });
+    });
+
+    if (controller instanceof SerialPort) {
+        controller.on("open", () => {
+            console.log("Arduino接続完了!");
+        });
+
+        controller.on("error", (err) => {
+            console.error("シリアルポートエラー:", err);
+        });
+    } else {
+        controller.on("connect", () => {
+            console.log("Arduino シミュレーター接続完了!");
+        });
+
+        controller.on("error", (err) => {
+            console.error("シミュレーター接続エラー:", err);
+        });
+    }
+}
+
+// Arduino ポート検索
+async function findArduinoPort(): Promise<string | null> {
+    const ports = await SerialPort.list();
+
+    console.log("利用可能なシリアルポート:");
+    ports.forEach((port) => {
+        console.log(`- ${port.path} (${port.manufacturer || "Unknown"})`);
+    });
+
+    // 環境変数で指定されたポートを優先
+    if (process.env.ARDUINO_PORT) {
+        const envPort = process.env.ARDUINO_PORT;
+        const portExists = ports.some((port) => port.path === envPort);
+
+        if (portExists) {
+            console.log(`環境変数ARDUINO_PORTより ${envPort} を使用`);
+            return envPort;
+        } else {
+            console.warn(`指定されたARDUINO_PORT ${envPort} が見つかりません`);
+        }
+    }
+
+    // Arduino製造元のポートを検索
+    const arduinoPort = ports.find(
+        (port) =>
+            port.manufacturer &&
+            (port.manufacturer.includes("Arduino") ||
+                port.manufacturer.includes("Arduino LLC"))
+    );
+
+    if (arduinoPort) {
+        console.log(`Arduino ポートを検出: ${arduinoPort.path}`);
+        return arduinoPort.path;
+    } else {
+        console.warn("Arduino ポートが見つかりませんでした");
+        return null;
+    }
+}
+
+// Socket.IO接続イベント
+io.on("connection", connection);
+
+// サーバー起動
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Frontend URL: http://localhost:3000`);
+    console.log(`Players: ${quizState.players.length} initialized`);
+});
