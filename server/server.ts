@@ -83,6 +83,11 @@ type QuizState = {
     pressedOrder: number[];
 };
 
+type UISettings = {
+    showHint: boolean;
+    showAnswer: boolean;
+};
+
 type QuizSetting = {
     maxPlayers: number;
     hintTime: number;
@@ -122,6 +127,20 @@ const quizSetting: QuizSetting = {
     answerBreakPenalty: 1,
 };
 
+const uiSettings: UISettings = {
+    showHint: false,
+    showAnswer: false,
+};
+
+// 状態ブロードキャスト関数
+function broadcastState() {
+    const fullState = {
+        ...quizState,
+        ...uiSettings,
+    };
+    io.emit("state", fullState);
+}
+
 // ゲームロジック関数
 function correctAnswer() {
     if (quizState.pressedOrder.length === 0) {
@@ -148,8 +167,11 @@ function correctAnswer() {
     // クイズ終了処理
     endCurrentQuiz();
 
+    // 正解イベントを送信
+    io.emit("correctAnswer", { playerId: firstPlayerId });
+
     // 全クライアントに状態をブロードキャスト
-    io.emit("state", quizState);
+    broadcastState();
 }
 
 function incorrectAnswer() {
@@ -190,8 +212,11 @@ function incorrectAnswer() {
         });
     }
 
+    // 不正解イベントを送信
+    io.emit("incorrectAnswer", { playerId: firstPlayerId });
+
     // 全クライアントに状態をブロードキャスト
-    io.emit("state", quizState);
+    broadcastState();
 }
 
 function endCurrentQuiz() {
@@ -208,7 +233,7 @@ function endQuiz() {
     console.log("クイズが終了されました");
 
     // 全クライアントに状態をブロードキャスト
-    io.emit("state", quizState);
+    broadcastState();
 }
 
 // Socket.IO接続処理
@@ -216,7 +241,11 @@ function connection(socket: Socket) {
     console.log("クライアント接続:", socket.id);
 
     // 接続直後に現在の状態を送信
-    socket.emit("state", quizState);
+    const fullState = {
+        ...quizState,
+        ...uiSettings,
+    };
+    socket.emit("state", fullState);
 
     // 問題設定
     socket.on("setQuestion", (data: QuestionData) => {
@@ -225,14 +254,18 @@ function connection(socket: Socket) {
         quizState.isActive = true;
         quizState.pressedOrder = [];
 
-        // 押下状態をリセット
+        // 押下状態をリセット（UI設定はリセットしない）
         quizState.players.forEach((player) => {
             player.pressed = false;
             player.order = null;
         });
 
+        // UI設定をリセット
+        uiSettings.showHint = false;
+        uiSettings.showAnswer = false;
+
         // 全クライアントに新しい状態をブロードキャスト
-        io.emit("state", quizState);
+        broadcastState();
     });
 
     // プレーヤー名更新
@@ -250,7 +283,7 @@ function connection(socket: Socket) {
                 );
 
                 // 全クライアントに状態をブロードキャスト
-                io.emit("state", quizState);
+                broadcastState();
             } else {
                 console.warn(`無効なプレーヤーID: ${playerId}`);
             }
@@ -273,6 +306,20 @@ function connection(socket: Socket) {
     socket.on("endQuiz", () => {
         console.log("クイズ終了ボタンが押されました");
         endQuiz();
+    });
+
+    // ヒント表示/非表示
+    socket.on("setShowHint", (show: boolean) => {
+        uiSettings.showHint = show;
+        console.log(`ヒント表示設定: ${show}`);
+        broadcastState();
+    });
+
+    // 答え表示/非表示
+    socket.on("setShowAnswer", (show: boolean) => {
+        uiSettings.showAnswer = show;
+        console.log(`答え表示設定: ${show}`);
+        broadcastState();
     });
 
     // 切断処理
@@ -326,7 +373,7 @@ function handleButtonPress(data: ArduinoData) {
         io.emit("buttonPressed", { buttonId, timestamp: data.timestamp });
 
         // 更新された状態を全クライアントにブロードキャスト
-        io.emit("state", quizState);
+        broadcastState();
     }
 }
 

@@ -18,6 +18,8 @@ export type QuizState = {
     isActive: boolean;
     players: Player[];
     pressedOrder: number[];
+    showHint?: boolean;
+    showAnswer?: boolean;
 };
 
 export type QuizSetting = {
@@ -41,6 +43,8 @@ export type SocketEvents = {
     correctAnswer: void;
     incorrectAnswer: void;
     endQuiz: void;
+    setShowHint: boolean;
+    setShowAnswer: boolean;
 };
 
 // フロントエンド専用の型
@@ -58,8 +62,6 @@ export type ConnectionStatus =
     | "error";
 
 export type UIState = {
-    showHint: boolean;
-    showAnswer: boolean;
     currentQuestionIndex: number;
     questionSets: QuestionSet[];
     selectedQuestionSet: string | null;

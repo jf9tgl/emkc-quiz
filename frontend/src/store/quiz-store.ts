@@ -50,11 +50,11 @@ const initialQuizState: QuizState = {
         order: null,
     })),
     pressedOrder: [],
+    showHint: false,
+    showAnswer: false,
 };
 
 const initialUIState: UIState = {
-    showHint: false,
-    showAnswer: false,
     currentQuestionIndex: 0,
     questionSets: [],
     selectedQuestionSet: null,
@@ -70,17 +70,30 @@ export const useQuizStore = create<QuizStore>()(
         // Connection Actions
         setConnectionStatus: (status) => set({ connectionStatus: status }),
 
-        updateQuizState: (state) =>
+        updateQuizState: (state) => {
+            console.log("状態更新受信:", state);
             set({
                 questionData: state.questionData,
                 isActive: state.isActive,
                 players: state.players,
                 pressedOrder: state.pressedOrder,
-            }),
+                showHint: state.showHint !== undefined ? state.showHint : false,
+                showAnswer:
+                    state.showAnswer !== undefined ? state.showAnswer : false,
+            });
+        },
 
         // UI Actions
-        setShowHint: (show) => set({ showHint: show }),
-        setShowAnswer: (show) => set({ showAnswer: show }),
+        setShowHint: (show) => {
+            console.log(`フロントエンド: ヒント表示設定 ${show}`);
+            set({ showHint: show });
+            socketManager.emit("setShowHint", show);
+        },
+        setShowAnswer: (show) => {
+            console.log(`フロントエンド: 答え表示設定 ${show}`);
+            set({ showAnswer: show });
+            socketManager.emit("setShowAnswer", show);
+        },
         setCurrentQuestionIndex: (index) =>
             set({ currentQuestionIndex: index }),
 
