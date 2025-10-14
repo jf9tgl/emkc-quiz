@@ -18,6 +18,8 @@ import { Server, Socket } from "socket.io";
 import cors from "cors";
 import { SerialPort } from "serialport";
 import net from "net";
+import dotenv from "dotenv";
+dotenv.config();
 
 const PORT = process.env.PORT || 3001;
 
