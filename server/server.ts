@@ -21,27 +21,109 @@ import net from "net";
 import dotenv from "dotenv";
 dotenv.config();
 
-const PORT = process.env.PORT || 3001;
+// コマンドライン引数の解析
+function parseArgs() {
+    const args = process.argv.slice(2);
+    const options: { port?: number; comPort?: string; simulator?: boolean } =
+        {};
+
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+
+        if (arg === "--port" || arg === "-p") {
+            const nextArg = args[i + 1];
+            if (nextArg) {
+                const portValue = parseInt(nextArg);
+                if (!isNaN(portValue)) {
+                    options.port = portValue;
+                    i++;
+                }
+            }
+        } else if (arg === "--com" || arg === "-c") {
+            const nextArg = args[i + 1];
+            if (nextArg) {
+                options.comPort = nextArg;
+                i++;
+            }
+        } else if (arg === "--simulator" || arg === "-s") {
+            options.simulator = true;
+        } else if (arg === "--help" || arg === "-h") {
+            console.log(`
+使用方法: server [オプション]
+
+オプション:
+  -p, --port <番号>       サーバーポート番号 (デフォルト: 3001)
+  -c, --com <ポート>      COMポート名 (例: COM3)
+  -s, --simulator         Arduinoシミュレーターを使用
+  -h, --help              このヘルプを表示
+
+例:
+  server --port 3002
+  server --com COM5
+  server --port 3002 --com COM5
+  server --simulator
+            `);
+            process.exit(0);
+        }
+    }
+
+    return options;
+}
+
+const cmdOptions = parseArgs();
+const PORT = cmdOptions.port || parseInt(process.env.PORT || "3001");
+const COM_PORT = cmdOptions.comPort || process.env.COM_PORT;
+const USE_SIMULATOR =
+    cmdOptions.simulator || process.env.USE_SIMULATOR === "true";
+
+console.log(`設定:
+  - サーバーポート: ${PORT}
+  - COMポート: ${COM_PORT || "自動検出"}
+  - シミュレーター: ${USE_SIMULATOR ? "有効" : "無効"}
+`);
 
 // Arduino接続設定（開発時はシミュレーター使用）
 let controller: SerialPort | net.Socket;
 
-if (process.env.USE_SIMULATOR === "true") {
-    controller = net.connect(4000, "localhost");
-    console.log("Using Arduino simulator at localhost:4000");
-} else {
-    const portPath = await findArduinoPort();
-    if (!portPath) {
-        console.error("Arduino ポートが見つかりませんでした");
-        process.exit(1);
+// 初期化関数
+async function initializeArduino() {
+    if (USE_SIMULATOR) {
+        controller = net.connect(4000, "localhost");
+        console.log("Using Arduino simulator at localhost:4000");
+    } else {
+        let portPath: string | null;
+
+        if (COM_PORT) {
+            // コマンドライン引数または環境変数で指定されたポートを使用
+            portPath = COM_PORT;
+            console.log(`指定されたCOMポートを使用: ${portPath}`);
+        } else {
+            // 自動検出
+            portPath = await findArduinoPort();
+            if (!portPath) {
+                console.error("Arduino ポートが見つかりませんでした");
+                console.log(
+                    "ヒント: --com オプションでCOMポートを指定できます (例: --com COM3)"
+                );
+                process.exit(1);
+            }
+            console.log(`自動検出されたCOMポート: ${portPath}`);
+        }
+
+        controller = new SerialPort({
+            path: portPath,
+            baudRate: 9600,
+        });
     }
-    controller = new SerialPort({
-        path: portPath,
-        baudRate: 9600,
-    });
+
+    initializeSerial();
 }
 
-initializeSerial();
+// サーバー起動時にArduinoを初期化
+initializeArduino().catch((error) => {
+    console.error("Arduino初期化エラー:", error);
+    process.exit(1);
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -104,11 +186,11 @@ type ArduinoData = {
     timestamp: number;
 };
 
-// 初期状態（6人プレーヤー対応）
+// 初期状態（5人プレーヤー対応）
 const quizState: QuizState = {
     questionData: null,
     isActive: false,
-    players: Array.from({ length: 6 }, (_, i) => ({
+    players: Array.from({ length: 5 }, (_, i) => ({
         id: i + 1,
         name: `Player ${i + 1}`,
         score: 0,
@@ -119,11 +201,11 @@ const quizState: QuizState = {
 };
 
 const quizSetting: QuizSetting = {
-    maxPlayers: 6,
+    maxPlayers: 5,
     hintTime: 10,
     answerTime: 20,
     correctPoints: 10,
-    incorrectPoints: -5,
+    incorrectPoints: 0,
     answerBreakPenalty: 1,
 };
 

@@ -44,11 +44,11 @@ export function QuestionSetManager({
     ]);
 
     const [quizSettings, setQuizSettings] = useState<QuizSetting>({
-        maxPlayers: 6,
+        maxPlayers: 5,
         hintTime: 10,
         answerTime: 20,
         correctPoints: 10,
-        incorrectPoints: -5,
+        incorrectPoints: 0,
         answerBreakPenalty: 1,
     });
 
@@ -121,8 +121,10 @@ export function QuestionSetManager({
             setIsCreating(false);
             setNewSetTitle("");
             setNewQuestions([{ question: "", answer: "", hint: null }]);
-            
-            toast.success(`問題セット「${newSet.title}」を作成しました！（${newSet.questions.length}問）`);
+
+            toast.success(
+                `問題セット「${newSet.title}」を作成しました！（${newSet.questions.length}問）`
+            );
         }
     };
 
@@ -231,7 +233,9 @@ export function QuestionSetManager({
                 }
 
                 toast.success(
-                    `データのインポートが完了しました！（${importData.questionSets?.length || 0}問題セット）`
+                    `データのインポートが完了しました！（${
+                        importData.questionSets?.length || 0
+                    }問題セット）`
                 );
                 loadQuestionSets();
             } catch (error) {
@@ -575,10 +579,11 @@ export function QuestionSetManager({
                     questionSets.map((set) => (
                         <div
                             key={set.id}
-                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedQuestionSet === set.id
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-200 hover:border-gray-300"
-                                }`}
+                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                                selectedQuestionSet === set.id
+                                    ? "border-blue-500 bg-blue-50"
+                                    : "border-gray-200 hover:border-gray-300"
+                            }`}
                             onClick={() => setSelectedQuestionSet(set.id)}
                         >
                             <div className="flex justify-between items-start">
@@ -599,9 +604,12 @@ export function QuestionSetManager({
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             // 編集機能は将来実装予定
-                                            toast("編集機能は今後実装予定です", {
-                                                icon: "🔧",
-                                            });
+                                            toast(
+                                                "編集機能は今後実装予定です",
+                                                {
+                                                    icon: "🔧",
+                                                }
+                                            );
                                         }}
                                         className="p-1 text-gray-600 hover:text-blue-600"
                                         title="編集"

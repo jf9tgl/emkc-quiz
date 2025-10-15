@@ -65,7 +65,9 @@ export default function DisplayPage() {
                                     <QuestionDisplay
                                         questionData={questionData}
                                         showHint={showHint ? showHint : false}
-                                        showAnswer={showAnswer ? showAnswer : false}
+                                        showAnswer={
+                                            showAnswer ? showAnswer : false
+                                        }
                                     />
                                 ) : (
                                     <WaitingDisplay />
