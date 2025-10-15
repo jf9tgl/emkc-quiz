@@ -290,6 +290,13 @@ function connection(socket: Socket) {
         }
     );
 
+    socket.on("setQuizSetting", (data: Partial<QuizSetting>) => {
+        Object.assign(quizSetting, data);
+        console.log("クイズ設定が更新されました:", quizSetting);
+        // 必要に応じて全クライアントに状態をブロードキャスト
+        broadcastState();
+    });
+
     // 正解処理
     socket.on("correctAnswer", () => {
         console.log("正解ボタンが押されました");

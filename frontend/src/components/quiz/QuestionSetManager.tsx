@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuizStore } from "@/store/quiz-store";
 import { QuestionData, QuestionSet, QuizSetting } from "@/lib/types";
 import {
@@ -14,6 +14,7 @@ import {
     X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 
 interface QuestionSetManagerProps {
     onQuestionSelect: (question: QuestionData) => void;
@@ -29,6 +30,9 @@ export function QuestionSetManager({
         removeQuestionSet,
         setSelectedQuestionSet,
         loadQuestionSets,
+        players,
+        sendUpdatePlayerName,
+        sendSetQuizSetting,
     } = useQuizStore();
 
     const [isCreating, setIsCreating] = useState(false);
@@ -48,6 +52,57 @@ export function QuestionSetManager({
         answerBreakPenalty: 1,
     });
 
+    const [playerNames, setPlayerNames] = useState<Record<number, string>>({});
+
+    // プレイヤー名の初期化と同期
+    useEffect(() => {
+        const initialNames: Record<number, string> = {};
+        players.forEach((player) => {
+            initialNames[player.id] = player.name;
+        });
+        setPlayerNames(initialNames);
+    }, [players]);
+
+    // クイズ設定の初期化（ローカルストレージから読み込み）
+    useEffect(() => {
+        const savedSettings = localStorage.getItem("quiz-settings");
+        if (savedSettings) {
+            try {
+                const parsedSettings = JSON.parse(savedSettings);
+                setQuizSettings(parsedSettings);
+            } catch (error) {
+                console.error("Failed to load quiz settings:", error);
+            }
+        }
+    }, []);
+
+    const handleSaveSettings = () => {
+        // プレイヤー名が変更されている場合、それぞれ送信
+        let playerNameChangeCount = 0;
+        players.forEach((player) => {
+            if (
+                playerNames[player.id] &&
+                playerNames[player.id] !== player.name
+            ) {
+                sendUpdatePlayerName(player.id, playerNames[player.id]);
+                playerNameChangeCount++;
+            }
+        });
+
+        // クイズ設定をサーバーに送信
+        sendSetQuizSetting(quizSettings);
+
+        // ローカルストレージにも保存（バックアップ用）
+        localStorage.setItem("quiz-settings", JSON.stringify(quizSettings));
+
+        // 成功トースト
+        const message =
+            playerNameChangeCount > 0
+                ? `設定を保存しました！（プレイヤー名: ${playerNameChangeCount}件更新）`
+                : "設定を保存しました！";
+        toast.success(message);
+    };
+
     const handleCreateSet = () => {
         if (
             newSetTitle.trim() &&
@@ -66,6 +121,8 @@ export function QuestionSetManager({
             setIsCreating(false);
             setNewSetTitle("");
             setNewQuestions([{ question: "", answer: "", hint: null }]);
+            
+            toast.success(`問題セット「${newSet.title}」を作成しました！（${newSet.questions.length}問）`);
         }
     };
 
@@ -97,9 +154,16 @@ export function QuestionSetManager({
     };
 
     const handleExportData = () => {
+        // プレイヤー名を現在の状態から取得
+        const playerNamesData: Record<number, string> = {};
+        players.forEach((player) => {
+            playerNamesData[player.id] = player.name;
+        });
+
         const exportData = {
             questionSets,
             quizSettings,
+            playerNames: playerNamesData,
             exportedAt: new Date().toISOString(),
             version: "1.0.0",
         };
@@ -115,6 +179,8 @@ export function QuestionSetManager({
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+
+        toast.success("データをエクスポートしました！");
     };
 
     const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,6 +191,7 @@ export function QuestionSetManager({
         reader.onload = (e) => {
             try {
                 const importData = JSON.parse(e.target?.result as string);
+                let importCount = 0;
 
                 if (
                     importData.questionSets &&
@@ -140,16 +207,35 @@ export function QuestionSetManager({
                                 Math.random().toString(36).substr(2, 9), // 重複を避けるために新しいIDを生成
                         });
                     });
+                    importCount++;
                 }
 
                 if (importData.quizSettings) {
                     setQuizSettings(importData.quizSettings);
+                    // サーバーにも送信
+                    sendSetQuizSetting(importData.quizSettings);
+                    importCount++;
                 }
 
-                alert("データのインポートが完了しました！");
+                // プレイヤー名のインポート
+                if (importData.playerNames) {
+                    Object.entries(importData.playerNames).forEach(
+                        ([playerId, name]) => {
+                            sendUpdatePlayerName(
+                                parseInt(playerId),
+                                name as string
+                            );
+                        }
+                    );
+                    importCount++;
+                }
+
+                toast.success(
+                    `データのインポートが完了しました！（${importData.questionSets?.length || 0}問題セット）`
+                );
                 loadQuestionSets();
             } catch (error) {
-                alert(
+                toast.error(
                     "ファイルの読み込みに失敗しました。正しいJSON形式かご確認ください。"
                 );
                 console.error("Import error:", error);
@@ -214,7 +300,43 @@ export function QuestionSetManager({
                         className="mb-6 p-4 bg-gray-50 rounded-lg border"
                     >
                         <h3 className="font-semibold mb-4">クイズ設定</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+
+                        {/* プレイヤー名設定 */}
+                        <div className="mb-6">
+                            <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                プレイヤー名
+                            </h4>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {players.map((player) => (
+                                    <div key={player.id}>
+                                        <label className="block text-xs text-gray-600 mb-1">
+                                            プレイヤー {player.id}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={
+                                                playerNames[player.id] ||
+                                                player.name
+                                            }
+                                            onChange={(e) =>
+                                                setPlayerNames((prev) => ({
+                                                    ...prev,
+                                                    [player.id]: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                                            placeholder={`プレイヤー ${player.id}`}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* ポイント設定 */}
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">
+                            ポイント設定
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     正解ポイント
@@ -266,6 +388,17 @@ export function QuestionSetManager({
                                     className="w-full p-2 border border-gray-300 rounded-md"
                                 />
                             </div>
+                        </div>
+
+                        {/* 保存ボタン */}
+                        <div className="flex justify-end">
+                            <button
+                                onClick={handleSaveSettings}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+                            >
+                                <Save size={16} />
+                                設定を保存
+                            </button>
                         </div>
                     </motion.div>
                 )}
@@ -466,7 +599,9 @@ export function QuestionSetManager({
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             // 編集機能は将来実装予定
-                                            alert("編集機能は今後実装予定です");
+                                            toast("編集機能は今後実装予定です", {
+                                                icon: "🔧",
+                                            });
                                         }}
                                         className="p-1 text-gray-600 hover:text-blue-600"
                                         title="編集"
@@ -482,6 +617,9 @@ export function QuestionSetManager({
                                                 )
                                             ) {
                                                 removeQuestionSet(set.id);
+                                                toast.success(
+                                                    `問題セット「${set.title}」を削除しました`
+                                                );
                                             }
                                         }}
                                         className="p-1 text-gray-600 hover:text-red-600"
@@ -528,11 +666,14 @@ export function QuestionSetManager({
                                                             )}
                                                         </div>
                                                         <button
-                                                            onClick={() =>
+                                                            onClick={() => {
                                                                 onQuestionSelect(
                                                                     question
-                                                                )
-                                                            }
+                                                                );
+                                                                toast.success(
+                                                                    "問題を選択しました"
+                                                                );
+                                                            }}
                                                             className="ml-2 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                                                         >
                                                             選択

@@ -6,6 +6,7 @@ import {
     ConnectionStatus,
     QuestionSet,
     QuestionData,
+    QuizSetting,
 } from "@/lib/types";
 import { socketManager } from "@/lib/socket";
 
@@ -32,6 +33,7 @@ interface QuizStore extends QuizState, UIState {
     // Socket Actions
     sendSetQuestion: (question: QuestionData) => void;
     sendUpdatePlayerName: (playerId: number, name: string) => void;
+    sendSetQuizSetting: (setting: Partial<QuizSetting>) => void;
     sendCorrectAnswer: () => void;
     sendIncorrectAnswer: () => void;
     sendEndQuiz: () => void;
@@ -152,6 +154,10 @@ export const useQuizStore = create<QuizStore>()(
 
         sendUpdatePlayerName: (playerId, name) => {
             socketManager.emit("updatePlayerName", { playerId, name });
+        },
+
+        sendSetQuizSetting: (setting) => {
+            socketManager.emit("setQuizSetting", setting);
         },
 
         sendCorrectAnswer: () => {
