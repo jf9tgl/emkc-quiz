@@ -251,57 +251,6 @@ export function QuestionSetManager({
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    ヒント表示時間（秒）
-                                </label>
-                                <input
-                                    type="number"
-                                    value={quizSettings.hintTime}
-                                    onChange={(e) =>
-                                        setQuizSettings((prev) => ({
-                                            ...prev,
-                                            hintTime:
-                                                parseInt(e.target.value) || 0,
-                                        }))
-                                    }
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    解答時間（秒）
-                                </label>
-                                <input
-                                    type="number"
-                                    value={quizSettings.answerTime}
-                                    onChange={(e) =>
-                                        setQuizSettings((prev) => ({
-                                            ...prev,
-                                            answerTime:
-                                                parseInt(e.target.value) || 0,
-                                        }))
-                                    }
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    最大プレーヤー数
-                                </label>
-                                <input
-                                    type="number"
-                                    value={quizSettings.maxPlayers}
-                                    onChange={(e) =>
-                                        setQuizSettings((prev) => ({
-                                            ...prev,
-                                            maxPlayers:
-                                                parseInt(e.target.value) || 6,
-                                        }))
-                                    }
-                                    className="w-full p-2 border border-gray-300 rounded-md"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
                                     休みペナルティ
                                 </label>
                                 <input
@@ -493,11 +442,10 @@ export function QuestionSetManager({
                     questionSets.map((set) => (
                         <div
                             key={set.id}
-                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                                selectedQuestionSet === set.id
-                                    ? "border-blue-500 bg-blue-50"
-                                    : "border-gray-200 hover:border-gray-300"
-                            }`}
+                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedQuestionSet === set.id
+                                ? "border-blue-500 bg-blue-50"
+                                : "border-gray-200 hover:border-gray-300"
+                                }`}
                             onClick={() => setSelectedQuestionSet(set.id)}
                         >
                             <div className="flex justify-between items-start">
