@@ -1,0 +1,42 @@
+{
+    "name": "server",
+    "module": "server.ts",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "dev": "tsx server.ts",
+        "dev:server-only": "tsx server.ts --server-only",
+        "build": "tsc --project tsconfig.build.json",
+        "package": "npm run build && pkg . --out-path ./target --targets node20-win-x64",
+        "start": "node ./target/server.exe"
+    },
+    "bin": "dist/server.js",
+    "pkg": {
+        "assets": [
+            "dist/**/*",
+            ".env"
+        ],
+        "targets": [
+            "node20-win-x64"
+        ],
+        "outputPath": "./target"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "@yao-pkg/pkg": "^6.8.0",
+        "ts-node": "^10.9.2",
+        "tsx": "^4.20.6"
+    },
+    "peerDependencies": {
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "@types/express": "^5.0.3",
+        "@types/socket.io": "^3.0.2",
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.3",
+        "express": "^5.1.0",
+        "serialport": "^13.0.0",
+        "socket.io": "^4.8.1"
+    }
+}

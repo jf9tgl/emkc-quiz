@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
-import type { QuizState, ConnectionStatus } from "@shared/types";
+import type { QuizState, ConnectionStatus } from "@/shared/types";
 import { socketManager } from "@/lib/socket";
 
 interface QuizStore extends QuizState {

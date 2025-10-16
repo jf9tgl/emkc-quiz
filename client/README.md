@@ -1,33 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Client - タブレット用ボタン UI
 
-## Getting Started
+クイズシステムのタブレット用インターフェースです。プレイヤーが問題を見て、早押しボタンを押すために使用します。
 
-First, run the development server:
+## セットアップ
+
+### 1. 依存関係のインストール
+
+```bash
+npm install
+```
+
+### 2. 環境変数の設定
+
+`.env.local`ファイルを作成：
+
+```bash
+# ローカル開発
+NEXT_PUBLIC_SERVER_URL=http://localhost:3001
+```
+
+### 3. 開発サーバーの起動
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで [http://localhost:3002](http://localhost:3002) を開きます。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Vercel へのデプロイ
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+詳細は [DEPLOYMENT-GUIDE.md](../docs/DEPLOYMENT-GUIDE.md) を参照してください。
 
-## Learn More
+### クイックスタート
 
-To learn more about Next.js, take a look at the following resources:
+1. **Vercel アカウント作成**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    - https://vercel.com でサインアップ
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. **プロジェクトをインポート**
+
+    - "New Project" → GitHub リポジトリを選択
+    - Root Directory: `client`
+
+3. **環境変数を設定**
+
+    ```
+    NEXT_PUBLIC_SERVER_URL=https://your-server-url.onrender.com
+    ```
+
+4. **デプロイ**
+    - "Deploy"をクリック
+
+## ビルド
+
+```bash
+npm run build
+```
+
+## 使用方法
+
+1. プレイヤー選択画面で自分の番号を選択
+2. 問題が表示されたら"PUSH!"ボタンをタップ
+3. 押下順が記録され、管理画面に反映されます
+
+## 技術スタック
+
+-   Next.js 15.5.5
+-   TypeScript
+-   Tailwind CSS
+-   Socket.IO Client
+-   Zustand (状態管理)
+-   Framer Motion (アニメーション)
 
 ## Deploy on Vercel
 

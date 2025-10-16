@@ -1,42 +1,31 @@
 {
     "name": "server",
-    "module": "server.ts",
+    "version": "2.0.0",
+    "description": "EMKC Quiz Server - Tablet Edition (No Arduino)",
     "type": "module",
     "private": true,
     "scripts": {
         "dev": "tsx server.ts",
-        "dev:server-only": "tsx server.ts --server-only",
-        "build": "tsc --project tsconfig.build.json",
-        "package": "npm run build && pkg . --out-path ./target --targets node20-win-x64",
-        "start": "node ./target/server.exe"
-    },
-    "bin": "dist/server.js",
-    "pkg": {
-        "assets": [
-            "dist/**/*",
-            ".env"
-        ],
-        "targets": [
-            "node20-win-x64"
-        ],
-        "outputPath": "./target"
-    },
-    "devDependencies": {
-        "@types/bun": "latest",
-        "@yao-pkg/pkg": "^6.8.0",
-        "ts-node": "^10.9.2",
-        "tsx": "^4.20.6"
-    },
-    "peerDependencies": {
-        "typescript": "^5.9.3"
+        "build": "tsc",
+        "start": "node dist/server.js",
+        "deploy": "npm run build && pm2 restart emkc-quiz-server || pm2 start ecosystem.config.cjs",
+        "pm2:start": "pm2 start ecosystem.config.cjs",
+        "pm2:stop": "pm2 stop emkc-quiz-server",
+        "pm2:restart": "pm2 restart emkc-quiz-server",
+        "pm2:logs": "pm2 logs emkc-quiz-server",
+        "pm2:status": "pm2 status"
     },
     "dependencies": {
-        "@types/express": "^5.0.3",
-        "@types/socket.io": "^3.0.2",
         "cors": "^2.8.5",
-        "dotenv": "^17.2.3",
-        "express": "^5.1.0",
-        "serialport": "^13.0.0",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
         "socket.io": "^4.8.1"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.17",
+        "@types/express": "^5.0.0",
+        "@types/node": "^22.10.2",
+        "tsx": "^4.20.6",
+        "typescript": "^5.9.3"
     }
 }
