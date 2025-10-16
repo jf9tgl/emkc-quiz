@@ -397,6 +397,16 @@ function connection(socket: Socket) {
         endQuiz();
     });
 
+    // タブレットからのボタン押下（Arduinoと同じ処理）
+    socket.on("pressButton", (data: { buttonId: number; timestamp: number }) => {
+        console.log("タブレットからボタン押下:", data);
+        handleButtonPress({
+            type: "pressedButton",
+            buttonId: data.buttonId,
+            timestamp: data.timestamp,
+        });
+    });
+
     // ヒント表示/非表示
     socket.on("setShowHint", (show: boolean) => {
         uiSettings.showHint = show;

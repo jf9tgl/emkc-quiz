@@ -31,13 +31,15 @@ export type QuizSetting = {
     answerBreakPenalty: number;
 };
 
-// Socket.IO イベント用の型
-export type SocketEvents = {
-    // 受信イベント
+// Socket.IO イベント用の型（受信/送信で分離）
+export type SocketReceiveEvents = {
     state: QuizState;
     buttonPressed: { buttonId: number; timestamp: number };
+    correctAnswer: { playerId: number };
+    incorrectAnswer: { playerId: number };
+};
 
-    // 送信イベント
+export type SocketSendEvents = {
     setQuestion: QuestionData;
     updatePlayerName: { playerId: number; name: string };
     correctAnswer: void;
@@ -45,6 +47,7 @@ export type SocketEvents = {
     endQuiz: void;
     setShowHint: boolean;
     setShowAnswer: boolean;
+    pressButton: { buttonId: number; timestamp: number };
 };
 
 // フロントエンド専用の型
