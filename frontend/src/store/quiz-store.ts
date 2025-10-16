@@ -37,6 +37,9 @@ interface QuizStore extends QuizState, UIState {
     sendCorrectAnswer: () => void;
     sendIncorrectAnswer: () => void;
     sendEndQuiz: () => void;
+    sendButtonPress: (playerId: number) => void;
+    sendResetAllScores: () => void;
+    sendAdjustPlayerScore: (playerId: number, adjustment: number) => void;
 }
 
 const STORAGE_KEY = "quiz-question-sets";
@@ -170,6 +173,18 @@ export const useQuizStore = create<QuizStore>()(
 
         sendEndQuiz: () => {
             socketManager.emit("endQuiz", undefined);
+        },
+
+        sendButtonPress: (playerId) => {
+            socketManager.emit("virtualButtonPress", { playerId });
+        },
+
+        sendResetAllScores: () => {
+            socketManager.emit("resetAllScores", undefined);
+        },
+
+        sendAdjustPlayerScore: (playerId, adjustment) => {
+            socketManager.emit("adjustPlayerScore", { playerId, adjustment });
         },
     }))
 );

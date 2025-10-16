@@ -24,6 +24,8 @@ export default function AdminPage() {
         sendIncorrectAnswer,
         sendEndQuiz,
         sendUpdatePlayerName,
+        sendAdjustPlayerScore,
+        sendResetAllScores,
         setShowHint,
         setShowAnswer,
     } = useQuizStore();
@@ -117,6 +119,8 @@ export default function AdminPage() {
                                 players={players}
                                 pressedOrder={pressedOrder}
                                 onUpdatePlayerName={sendUpdatePlayerName}
+                                onAdjustPlayerScore={sendAdjustPlayerScore}
+                                onResetAllScores={sendResetAllScores}
                             />
                         </div>
                     </div>

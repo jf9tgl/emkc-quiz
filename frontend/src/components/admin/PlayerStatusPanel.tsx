@@ -1,6 +1,6 @@
 "use client";
 
-import { Users } from "lucide-react";
+import { Users, RotateCcw } from "lucide-react";
 import { PlayerItem } from "./PlayerItem";
 
 interface Player {
@@ -15,19 +15,35 @@ interface PlayerStatusPanelProps {
     players: Player[];
     pressedOrder: number[];
     onUpdatePlayerName: (playerId: number, newName: string) => void;
+    onAdjustPlayerScore?: (playerId: number, adjustment: number) => void;
+    onResetAllScores?: () => void;
 }
 
 export function PlayerStatusPanel({
     players,
     pressedOrder,
     onUpdatePlayerName,
+    onAdjustPlayerScore,
+    onResetAllScores,
 }: PlayerStatusPanelProps) {
     return (
         <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Users size={20} />
-                プレーヤー状況
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Users size={20} />
+                    プレーヤー状況
+                </h2>
+                {onResetAllScores && (
+                    <button
+                        onClick={onResetAllScores}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                        title="全員のスコアを0にリセット"
+                    >
+                        <RotateCcw size={16} />
+                        全員リセット
+                    </button>
+                )}
+            </div>
 
             <div className="space-y-3">
                 {players.map((player) => (
@@ -35,6 +51,7 @@ export function PlayerStatusPanel({
                         key={player.id}
                         player={player}
                         onUpdateName={onUpdatePlayerName}
+                        onAdjustScore={onAdjustPlayerScore}
                     />
                 ))}
             </div>
@@ -53,10 +70,11 @@ export function PlayerStatusPanel({
                             return (
                                 <span
                                     key={playerId}
-                                    className={`px-3 py-1 rounded-full text-sm font-medium ${index === 0
+                                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                        index === 0
                                             ? "bg-blue-600 text-white"
                                             : "bg-blue-200 text-blue-800"
-                                        }`}
+                                    }`}
                                 >
                                     {index + 1}. {player?.name}
                                 </span>

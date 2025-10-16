@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Edit3, Check, X } from "lucide-react";
+import { Edit3, Check, X, Plus, Minus } from "lucide-react";
 
 interface Player {
     id: number;
@@ -14,9 +14,10 @@ interface Player {
 interface PlayerItemProps {
     player: Player;
     onUpdateName: (playerId: number, newName: string) => void;
+    onAdjustScore?: (playerId: number, adjustment: number) => void;
 }
 
-export function PlayerItem({ player, onUpdateName }: PlayerItemProps) {
+export function PlayerItem({ player, onUpdateName, onAdjustScore }: PlayerItemProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editingName, setEditingName] = useState(player.name);
 
@@ -92,7 +93,27 @@ export function PlayerItem({ player, onUpdateName }: PlayerItemProps) {
                         </span>
                     )}
                 </div>
-                <span className="font-bold text-lg">{player.score}pt</span>
+                <div className="flex items-center gap-2">
+                    {onAdjustScore && (
+                        <>
+                            <button
+                                onClick={() => onAdjustScore(player.id, -1)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="1点減らす"
+                            >
+                                <Minus size={16} />
+                            </button>
+                            <button
+                                onClick={() => onAdjustScore(player.id, 1)}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="1点増やす"
+                            >
+                                <Plus size={16} />
+                            </button>
+                        </>
+                    )}
+                    <span className="font-bold text-lg">{player.score}pt</span>
+                </div>
             </div>
         </div>
     );

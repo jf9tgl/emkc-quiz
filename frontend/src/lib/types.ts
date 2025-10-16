@@ -45,6 +45,9 @@ export type SocketEvents = {
     endQuiz: void;
     setShowHint: boolean;
     setShowAnswer: boolean;
+    virtualButtonPress: { playerId: number };
+    resetAllScores: void;
+    adjustPlayerScore: { playerId: number; adjustment: number };
 };
 
 // フロントエンド専用の型

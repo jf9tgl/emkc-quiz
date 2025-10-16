@@ -372,6 +372,46 @@ function connection(socket: Socket) {
         }
     );
 
+    // 仮想ボタン押下（タブレットから）
+    socket.on("virtualButtonPress", (data: { playerId: number }) => {
+        const { playerId } = data;
+        console.log(`仮想ボタン押下: Player ${playerId}`);
+        handleButtonPress({
+            type: "pressedButton",
+            buttonId: playerId,
+            timestamp: Date.now(),
+        });
+    });
+
+    // 全員のスコアをリセット
+    socket.on("resetAllScores", () => {
+        console.log("全員のスコアをリセット");
+        quizState.players.forEach((player) => {
+            player.score = 0;
+        });
+        broadcastState();
+    });
+
+    // プレーヤーのスコア調整
+    socket.on(
+        "adjustPlayerScore",
+        (data: { playerId: number; adjustment: number }) => {
+            const { playerId, adjustment } = data;
+            const playerIndex = playerId - 1;
+            const player = quizState.players[playerIndex];
+
+            if (player) {
+                player.score += adjustment;
+                console.log(
+                    `Player ${playerId} のスコアを ${adjustment > 0 ? "+" : ""}${adjustment}点調整 (現在: ${player.score}点)`
+                );
+                broadcastState();
+            } else {
+                console.warn(`無効なプレーヤーID: ${playerId}`);
+            }
+        }
+    );
+
     socket.on("setQuizSetting", (data: Partial<QuizSetting>) => {
         Object.assign(quizSetting, data);
         console.log("クイズ設定が更新されました:", quizSetting);
