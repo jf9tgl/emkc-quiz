@@ -5,6 +5,7 @@
     "private": true,
     "scripts": {
         "dev": "tsx server.ts",
+        "dev:server-only": "tsx server.ts --server-only",
         "build": "tsc --project tsconfig.build.json",
         "package": "npm run build && pkg . --out-path ./target --targets node20-win-x64",
         "start": "node ./target/server.exe"

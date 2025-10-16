@@ -1,0 +1,15 @@
+{
+    "name": "@emkc-quiz/shared",
+    "version": "1.0.0",
+    "description": "Shared type definitions for EMKC Quiz System",
+    "main": "types.ts",
+    "types": "types.ts",
+    "scripts": {},
+    "keywords": [
+        "quiz",
+        "types",
+        "shared"
+    ],
+    "author": "",
+    "license": "MIT"
+}

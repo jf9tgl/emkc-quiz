@@ -19,13 +19,23 @@ import cors from "cors";
 import { SerialPort } from "serialport";
 import net from "net";
 import dotenv from "dotenv";
+import type {
+    Player,
+    QuestionData,
+    QuizState,
+    QuizSetting,
+} from "@shared/types";
 dotenv.config();
 
 // コマンドライン引数の解析
 function parseArgs() {
     const args = process.argv.slice(2);
-    const options: { port?: number; comPort?: string; simulator?: boolean } =
-        {};
+    const options: {
+        port?: number;
+        comPort?: string;
+        simulator?: boolean;
+        serverOnly?: boolean;
+    } = {};
 
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
@@ -47,6 +57,8 @@ function parseArgs() {
             }
         } else if (arg === "--simulator" || arg === "-s") {
             options.simulator = true;
+        } else if (arg === "--server-only" || arg === "-so") {
+            options.serverOnly = true;
         } else if (arg === "--help" || arg === "-h") {
             console.log(`
 使用方法: server [オプション]
@@ -55,6 +67,7 @@ function parseArgs() {
   -p, --port <番号>       サーバーポート番号 (デフォルト: 3001)
   -c, --com <ポート>      COMポート名 (例: COM3)
   -s, --simulator         Arduinoシミュレーターを使用
+  -so, --server-only      Arduinoなしでサーバーのみ起動（タブレット専用）
   -h, --help              このヘルプを表示
 
 例:
@@ -62,6 +75,7 @@ function parseArgs() {
   server --com COM5
   server --port 3002 --com COM5
   server --simulator
+  server --server-only
             `);
             process.exit(0);
         }
@@ -75,18 +89,31 @@ const PORT = cmdOptions.port || parseInt(process.env.PORT || "3001");
 const COM_PORT = cmdOptions.comPort || process.env.COM_PORT;
 const USE_SIMULATOR =
     cmdOptions.simulator || process.env.USE_SIMULATOR === "true";
+const SERVER_ONLY = cmdOptions.serverOnly || process.env.SERVER_ONLY === "true";
 
 console.log(`設定:
   - サーバーポート: ${PORT}
-  - COMポート: ${COM_PORT || "自動検出"}
-  - シミュレーター: ${USE_SIMULATOR ? "有効" : "無効"}
+  - モード: ${
+      SERVER_ONLY
+          ? "サーバーのみ（タブレット専用）"
+          : USE_SIMULATOR
+          ? "シミュレーター"
+          : "Arduino接続"
+  }
+  - COMポート: ${SERVER_ONLY ? "N/A" : COM_PORT || "自動検出"}
 `);
 
 // Arduino接続設定（開発時はシミュレーター使用）
-let controller: SerialPort | net.Socket;
+let controller: SerialPort | net.Socket | null = null;
 
 // 初期化関数
 async function initializeArduino() {
+    if (SERVER_ONLY) {
+        console.log("⚙️  サーバーオンリーモード: Arduinoなしで起動します");
+        console.log("📱 タブレットボタンのみ使用可能です");
+        return; // Arduinoの初期化をスキップ
+    }
+
     if (USE_SIMULATOR) {
         controller = net.connect(4000, "localhost");
         console.log("Using Arduino simulator at localhost:4000");
@@ -143,40 +170,10 @@ app.use(
 );
 app.use(express.json());
 
-// 型定義（フロントエンドと一致）
-type Player = {
-    id: number;
-    name: string;
-    score: number;
-    pressed: boolean;
-    order: number | null;
-};
-
-type QuestionData = {
-    question: string;
-    answer: string;
-    hint: string | null;
-};
-
-type QuizState = {
-    questionData: QuestionData | null;
-    isActive: boolean;
-    players: Player[];
-    pressedOrder: number[];
-};
-
+// UISettings 型定義（サーバー専用）
 type UISettings = {
     showHint: boolean;
     showAnswer: boolean;
-};
-
-type QuizSetting = {
-    maxPlayers: number;
-    hintTime: number;
-    answerTime: number;
-    correctPoints: number;
-    incorrectPoints: number;
-    answerBreakPenalty: number;
 };
 
 type ArduinoData = {
@@ -186,7 +183,7 @@ type ArduinoData = {
     timestamp: number;
 };
 
-// 初期状態（5人プレーヤー対応）
+// 初期状態(5人プレーヤー対応)
 const quizState: QuizState = {
     questionData: null,
     isActive: false,
@@ -411,6 +408,62 @@ function connection(socket: Socket) {
         broadcastState();
     });
 
+    // タブレットからのボタン押下
+    socket.on(
+        "pressButton",
+        (data: { playerId: number; timestamp: number }) => {
+            console.log(`タブレットボタン押下: Player ${data.playerId}`);
+            handleButtonPress({
+                type: "pressedButton",
+                buttonId: data.playerId,
+                timestamp: data.timestamp,
+            });
+        }
+    );
+
+    // スコア調整（増減）
+    socket.on("adjustScore", (data: { playerId: number; delta: number }) => {
+        const player = quizState.players.find((p) => p.id === data.playerId);
+        if (player) {
+            player.score += data.delta;
+            console.log(
+                `Player ${data.playerId} のスコアを ${
+                    data.delta > 0 ? "+" : ""
+                }${data.delta} 調整 → ${player.score}pt`
+            );
+            io.emit("scoreUpdated", {
+                playerId: data.playerId,
+                newScore: player.score,
+            });
+            broadcastState();
+        }
+    });
+
+    // スコア設定（直接指定）
+    socket.on("setScore", (data: { playerId: number; score: number }) => {
+        const player = quizState.players.find((p) => p.id === data.playerId);
+        if (player) {
+            player.score = data.score;
+            console.log(
+                `Player ${data.playerId} のスコアを ${data.score}pt に設定`
+            );
+            io.emit("scoreUpdated", {
+                playerId: data.playerId,
+                newScore: player.score,
+            });
+            broadcastState();
+        }
+    });
+
+    // 全員のスコアをリセット
+    socket.on("resetAllScores", () => {
+        console.log("全プレイヤーのスコアをリセット");
+        quizState.players.forEach((player) => {
+            player.score = 0;
+        });
+        broadcastState();
+    });
+
     // 切断処理
     socket.on("disconnect", (reason) => {
         console.log("クライアント切断:", socket.id, "理由:", reason);
@@ -471,6 +524,13 @@ let dataBuffer = "";
 
 // シリアル通信初期化
 async function initializeSerial() {
+    if (!controller) {
+        console.log(
+            "⚠️  Arduinoコントローラーが初期化されていません（サーバーオンリーモード）"
+        );
+        return;
+    }
+
     controller.on("data", (data: Buffer) => {
         // 受信データをバッファに追加
         dataBuffer += data.toString();
