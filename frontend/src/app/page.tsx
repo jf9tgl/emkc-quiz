@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings, Monitor, Trophy } from "lucide-react";
+import { Settings, Monitor, Trophy, Bell } from "lucide-react";
 
 export default function Home() {
     return (
@@ -19,7 +19,7 @@ export default function Home() {
                 </div>
 
                 {/* Navigation Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Admin Card */}
                     <Link href="/admin">
                         <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-8 border border-gray-200 hover:border-blue-300 cursor-pointer group">
@@ -65,6 +65,29 @@ export default function Home() {
                             </div>
                         </div>
                     </Link>
+
+                    {/* Buzzer Card */}
+                    <Link href="/buzzer">
+                        <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-8 border border-gray-200 hover:border-green-300 cursor-pointer group">
+                            <div className="text-center">
+                                <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-green-200 transition-colors">
+                                    <Bell
+                                        className="text-green-600"
+                                        size={32}
+                                    />
+                                </div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-3">
+                                    早押しボタン
+                                </h2>
+                                <p className="text-gray-600 mb-4">
+                                    タブレット・スマホで早押しボタンを操作します
+                                </p>
+                                <div className="text-green-600 font-medium group-hover:text-green-700">
+                                    ボタン画面を開く →
+                                </div>
+                            </div>
+                        </div>
+                    </Link>
                 </div>
 
                 {/* Features */}
@@ -75,10 +98,10 @@ export default function Home() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4">
                             <h4 className="font-semibold text-gray-800 mb-2">
-                                Arduino 連携
+                                タブレット早押し
                             </h4>
                             <p className="text-gray-600 text-sm">
-                                シリアル通信でボタン押下をリアルタイム検知
+                                物理ボタン不要！タブレットで早押し対応
                             </p>
                         </div>
                         <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4">
@@ -94,7 +117,7 @@ export default function Home() {
                                 スコア管理
                             </h4>
                             <p className="text-gray-600 text-sm">
-                                自動スコア計算と順位表示
+                                自動スコア計算と手動調整が可能
                             </p>
                         </div>
                     </div>
